@@ -1,0 +1,281 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="UTF-8">
+<title>μ-Incoherence</title>
+<style>
+:root {
+  --bg: #0a0e1a;
+  --card: #131929;
+  --border: #1e2a40;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --accent: #818cf8;
+  --green: #34d399;
+  --amber: #fbbf24;
+  --red: #f87171;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f1f5f9; --card: #ffffff; --border: #e2e8f0;
+    --text: #0f172a; --muted: #64748b; --accent: #4f46e5;
+    --green: #059669; --amber: #d97706; --red: #dc2626;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; padding: 20px 24px; min-height: 100vh; }
+h1 { font-size: 1.35rem; font-weight: 700; margin-bottom: 4px; }
+.sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+.defbox {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+  font-size: 0.85rem; line-height: 1.65; color: var(--text);
+}
+.defbox .hi { color: var(--accent); font-weight: 600; }
+.defbox .dim { color: var(--muted); font-size: 0.8rem; }
+.ctrl { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.ctrl label { color: var(--muted); font-size: 0.85rem; }
+.ctrl input[type=range] { accent-color: var(--accent); cursor: pointer; }
+.ctrl span.val { font-weight: 700; color: var(--text); min-width: 20px; }
+.btn { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 5px 13px; font-size: 0.82rem; cursor: pointer; font-weight: 500; }
+.btn:hover { opacity: 0.8; }
+.sec-title { font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 20px; }
+.mcard { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.mcard h3 { font-size: 0.85rem; font-weight: 600; }
+.mcard canvas { border-radius: 5px; }
+.badge { font-size: 0.82rem; padding: 3px 11px; border-radius: 20px; font-weight: 700; }
+.badge.r { background: rgba(248,113,113,.15); color: var(--red); }
+.badge.y { background: rgba(251,191,36,.15); color: var(--amber); }
+.badge.g { background: rgba(52,211,153,.15); color: var(--green); }
+.mdesc { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.4; }
+.colorbar { width: 100%; height: 10px; border-radius: 4px; margin-bottom: 3px;
+  background: linear-gradient(to right, #0a1628, #1e3a8a, #7c3aed, #dc2626, #fbbf24); }
+.clabels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); margin-bottom: 18px; }
+.hcard { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+.hcard h4 { font-size: 0.8rem; color: var(--muted); margin-bottom: 6px; }
+.icards { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-top: 16px; }
+.icard { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px; font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+.icard strong { color: var(--text); display: block; margin-bottom: 5px; font-size: 0.82rem; }
+@media (max-width: 600px) {
+  .grid3, .icards { grid-template-columns: 1fr; }
+}
+</style>
+
+<h1>μ-비간섭성 (μ-Incoherence) 시각화</h1>
+<p class="sub">QuIP / QuIP# 양자화의 핵심 개념 — 행렬 에너지의 균등 분산</p>
+
+<div class="defbox">
+  <b>Definition 1.</b>&nbsp; 대칭 Hessian 행렬 <span class="hi">H = QΛQᵀ</span>가
+  <span class="hi">μ-비간섭적</span>이다 ⟺ 모든 i, j에 대해
+  <span class="hi">|Q<sub>ij</sub>| ≤ μ / √n</span><br>
+  가중치 행렬 W ∈ ℝ<sup>m×n</sup>의 경우: <span class="hi">|W<sub>ij</sub>| ≤ μ ‖W‖<sub>F</sub> / √(mn)</span><br>
+  <span class="dim">→ μ가 작을수록 행렬 항목의 에너지가 고르게 퍼져 있음. 양자화 오차를 균등하게 만들어 최악의 경우를 줄임.</span>
+</div>
+
+<div class="ctrl">
+  <label>행렬 크기 n =</label>
+  <input type="range" id="sl" min="0" max="3" step="1" value="1">
+  <span class="val" id="nd">8</span>
+  <button class="btn" onclick="regen()">🔄 무작위 재생성</button>
+</div>
+
+<p class="sec-title">직교행렬 Q의 항목 절댓값 |Q<sub>ij</sub>| 히트맵</p>
+<div class="grid3">
+  <div class="mcard">
+    <h3>🔴 단위행렬 I</h3>
+    <canvas id="cv0" width="192" height="192"></canvas>
+    <div class="badge r" id="mu0">μ = √n</div>
+    <p class="mdesc">에너지가 대각선에만 집중<br>최대 비간섭 (worst case)</p>
+  </div>
+  <div class="mcard">
+    <h3>🟡 무작위 직교행렬 Q</h3>
+    <canvas id="cv1" width="192" height="192"></canvas>
+    <div class="badge y" id="mu1">μ = …</div>
+    <p class="mdesc">에너지가 균등하게 분산<br>QuIP에서 사용</p>
+  </div>
+  <div class="mcard">
+    <h3>🟢 정규화 하다마르 H/√n</h3>
+    <canvas id="cv2" width="192" height="192"></canvas>
+    <div class="badge g" id="mu2">μ = 1</div>
+    <p class="mdesc">모든 항목이 ±1/√n으로 완전 균등<br>QuIP#에서 사용 (이론 최소)</p>
+  </div>
+</div>
+
+<div class="colorbar"></div>
+<div class="clabels"><span>0 (작음)</span><span>|Q<sub>ij</sub>| 크기 (1/√n 기준으로 정규화)</span><span>큼</span></div>
+
+<p class="sec-title">|Q<sub>ij</sub>| 분포 히스토그램 — <span style="color:var(--red)">빨간 선</span>: μ=1 이상적 경계 1/√n, <span style="color:var(--green)">초록 선</span>: 실제 최댓값</p>
+<div class="grid3">
+  <div class="hcard"><h4>단위행렬</h4><canvas id="hv0" width="240" height="120"></canvas></div>
+  <div class="hcard"><h4>무작위 직교행렬</h4><canvas id="hv1" width="240" height="120"></canvas></div>
+  <div class="hcard"><h4>하다마르 행렬</h4><canvas id="hv2" width="240" height="120"></canvas></div>
+</div>
+
+<div class="icards">
+  <div class="icard">
+    <strong>🔴 단위행렬 (μ = √n)</strong>
+    H = I이면 고유벡터 행렬 Q = I. 대각 항목 = 1, 나머지 = 0.
+    한 방향에 에너지가 집중 → 양자화 오차 불균등 → 품질 저하.
+    μ = √n으로 n이 커질수록 더 나빠짐.
+  </div>
+  <div class="icard">
+    <strong>🟡 무작위 직교변환 (QuIP, NeurIPS 2023)</strong>
+    랜덤 직교행렬 Q로 H를 변환 (QHQᵀ) 후 양자화.
+    μ ≈ O(√log n) 수준. 에너지 분산 효과적이나
+    변환 비용 O(n²) → 큰 모델에서 느림.
+  </div>
+  <div class="icard">
+    <strong>🟢 하다마르 변환 (QuIP#, ICML 2024)</strong>
+    정규화 하다마르: 모든 항목 ±1/√n → μ = 1 (이론적 최솟값).
+    Fast Walsh-Hadamard Transform으로 O(n log n) 구현.
+    E8 격자 코드북과 결합해 2비트 양자화에서 최고 성능 달성.
+  </div>
+</div>
+
+<script>
+const NS = [4, 8, 16, 32];
+let N = 8, Qrand = null;
+
+function gauss() {
+  let u, v;
+  do { u = Math.random(); } while (!u);
+  do { v = Math.random(); } while (!v);
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+function randOrth(n) {
+  const m = new Float64Array(n*n);
+  for (let i=0;i<n*n;i++) m[i]=gauss();
+  for (let j=0;j<n;j++) {
+    for (let k=0;k<j;k++) {
+      let d=0; for (let i=0;i<n;i++) d+=m[i*n+j]*m[i*n+k];
+      for (let i=0;i<n;i++) m[i*n+j]-=d*m[i*n+k];
+    }
+    let nr=0; for (let i=0;i<n;i++) nr+=m[i*n+j]**2; nr=Math.sqrt(nr);
+    for (let i=0;i<n;i++) m[i*n+j]/=nr;
+  }
+  return m;
+}
+
+function hadamard(n) {
+  let H=[[1]], sz=1;
+  while(sz<n){
+    const H2=[];
+    for(let r=0;r<sz;r++) H2.push([...H[r],...H[r]]);
+    for(let r=0;r<sz;r++) H2.push([...H[r],...H[r].map(x=>-x)]);
+    H=H2; sz*=2;
+  }
+  const sc=1/Math.sqrt(n), m=new Float64Array(n*n);
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++) m[r*n+c]=H[r][c]*sc;
+  return m;
+}
+
+function identity(n){
+  const m=new Float64Array(n*n);
+  for(let i=0;i<n;i++) m[i*n+i]=1;
+  return m;
+}
+
+function mu(mat,n){
+  let mx=0; for(let i=0;i<n*n;i++) mx=Math.max(mx,Math.abs(mat[i]));
+  return mx*Math.sqrt(n);
+}
+
+// Color: 0→dark, 1→bright, relative to ref = 1/sqrt(n)
+function col(t){
+  const c=Math.min(1,t);
+  // dark blue → purple → red → yellow
+  if(c<0.33){ const p=c/0.33; return `rgb(${Math.round(10+p*60)},${Math.round(14+p*10)},${Math.round(100+p*100)})`; }
+  if(c<0.66){ const p=(c-0.33)/0.33; return `rgb(${Math.round(70+p*160)},${Math.round(24+p*20)},${Math.round(200-p*120)})`; }
+  const p=(c-0.66)/0.34;
+  return `rgb(${Math.round(230+p*25)},${Math.round(44+p*170)},${Math.round(80-p*70)})`;
+}
+
+function drawHeat(id, mat, n){
+  const cv=document.getElementById(id), ctx=cv.getContext('2d');
+  const W=cv.width, cw=W/n;
+  const ref=1/Math.sqrt(n)*1.5; // normalize: ref=1.5x ideal max
+  ctx.clearRect(0,0,W,W);
+  for(let r=0;r<n;r++) for(let c=0;c<n;c++){
+    const v=Math.abs(mat[r*n+c]);
+    ctx.fillStyle=col(v/ref);
+    ctx.fillRect(c*cw+0.5, r*cw+0.5, cw-1, cw-1);
+  }
+}
+
+function drawHist(id, mat, n, barCol){
+  const cv=document.getElementById(id), ctx=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const vals=[];
+  for(let i=0;i<n*n;i++) vals.push(Math.abs(mat[i]));
+  const idealBound=1/Math.sqrt(n);
+  const maxVal=Math.max(...vals)*1.3;
+  const nBins=24;
+  const bins=new Array(nBins).fill(0);
+  for(const v of vals){
+    const b=Math.min(nBins-1,Math.floor(v/maxVal*nBins));
+    bins[b]++;
+  }
+  const mx=Math.max(...bins,1);
+  const pl=28,pr=10,pt=8,pb=18;
+  const pw=W-pl-pr, ph=H-pt-pb;
+  // draw bars
+  const bw=pw/nBins;
+  for(let i=0;i<nBins;i++){
+    const bh=bins[i]/mx*ph;
+    ctx.fillStyle=barCol+'99';
+    ctx.fillRect(pl+i*bw, pt+ph-bh, bw-1, bh);
+  }
+  // ideal bound line (red dashed)
+  const ibx=pl+idealBound/maxVal*pw;
+  ctx.save(); ctx.strokeStyle='#f87171'; ctx.lineWidth=2; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(ibx,pt); ctx.lineTo(ibx,pt+ph); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle='#f87171'; ctx.font='9px sans-serif';
+  ctx.fillText('1/√n',ibx+2,pt+10);
+  // actual max (green dashed)
+  const actMax=Math.max(...vals);
+  const amx=pl+actMax/maxVal*pw;
+  ctx.save(); ctx.strokeStyle='#34d399'; ctx.lineWidth=2; ctx.setLineDash([3,4]);
+  ctx.beginPath(); ctx.moveTo(amx,pt); ctx.lineTo(amx,pt+ph); ctx.stroke();
+  ctx.restore();
+  ctx.fillStyle='#34d399'; ctx.font='9px sans-serif';
+  const lbl='max';
+  ctx.fillText(lbl, Math.min(amx+2, W-24), pt+22);
+  // axes
+  ctx.strokeStyle='#334155'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(pl,pt+ph); ctx.lineTo(pl+pw,pt+ph); ctx.stroke();
+  ctx.fillStyle='#64748b'; ctx.font='8px sans-serif';
+  ctx.fillText('0',pl,H-3);
+  ctx.fillText(maxVal.toFixed(2),W-pr-18,H-3);
+  ctx.fillText('|Qᵢⱼ|',pl+pw/2-10,H-3);
+}
+
+function update(){
+  const n=N;
+  const id=identity(n);
+  if(!Qrand) Qrand=randOrth(n);
+  const had=hadamard(n);
+  document.getElementById('mu0').textContent=`μ = ${mu(id,n).toFixed(2)} (= √${n})`;
+  document.getElementById('mu1').textContent=`μ = ${mu(Qrand,n).toFixed(2)}`;
+  document.getElementById('mu2').textContent=`μ = ${mu(had,n).toFixed(2)} (≈1)`;
+  drawHeat('cv0',id,n);
+  drawHeat('cv1',Qrand,n);
+  drawHeat('cv2',had,n);
+  drawHist('hv0',id,n,'#f87171');
+  drawHist('hv1',Qrand,n,'#fbbf24');
+  drawHist('hv2',had,n,'#34d399');
+}
+
+function regen(){ Qrand=randOrth(N); update(); }
+
+document.getElementById('sl').addEventListener('input',e=>{
+  N=NS[+e.target.value];
+  document.getElementById('nd').textContent=N;
+  Qrand=null; update();
+});
+
+update();
+</script>
+
+</body></html>
