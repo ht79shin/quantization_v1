@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>WHT 버터플라이 흐름</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500&display=swap">
+<style>
+:root {
+  --bg:#0b0f1c; --card:#131929; --edge:#1c2740;
+  --fg:#e0e8f8; --muted:#546080; --dim:#2a3550;
+  --pos:#60a5fa; --neg:#f87171; --act:#fbbf24;
+  --done:#34d399; --acc:#818cf8; --warn:#fb923c;
+  --inv:#a78bfa;
+  --info-bg:rgba(129,140,248,.1); --info-bd:rgba(129,140,248,.25);
+  color-scheme:dark;
+}
+@media (prefers-color-scheme:light){
+  :root{
+    --bg:#f0f4ff; --card:#fff; --edge:#dde4f4;
+    --fg:#0f172a; --muted:#64748b; --dim:#c8d3ec;
+    --info-bg:rgba(129,140,248,.08); --info-bd:rgba(129,140,248,.2);
+    color-scheme:light;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg);color:var(--fg);
+  font-family:'Inter',system-ui,sans-serif;
+  padding:20px 16px; max-width:960px; margin-inline:auto;
+}
+h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(.95rem,3vw,1.2rem);
+   font-weight:700;letter-spacing:-.01em;margin-bottom:3px;}
+.sub{font-size:.77rem;color:var(--muted);margin-bottom:10px;}
+.top-row{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.hd{flex:1 1 200px;}
+.badge{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:.77rem;padding:5px 11px;border-radius:8px;cursor:pointer;
+  border:1px solid;transition:background .2s;white-space:nowrap;user-select:none;
+}
+.badge.out{border-color:var(--warn);color:var(--warn);background:rgba(251,146,60,.08);}
+.badge.out.on{background:rgba(251,146,60,.22);}
+.badge.inv{border-color:var(--inv);color:var(--inv);background:rgba(167,139,250,.08);}
+.badge.inv.on{background:rgba(167,139,250,.22);}
+#cvWrap{background:var(--card);border:1px solid var(--edge);border-radius:12px;
+        padding:14px 10px 8px;margin-bottom:10px;overflow-x:auto;}
+canvas{display:block;}
+#info{font-size:.82rem;line-height:1.55;padding:9px 13px;
+  background:var(--info-bg);border:1px solid var(--info-bd);
+  border-radius:8px;margin-bottom:10px;min-height:44px;}
+.ctrls{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+.btn{font-family:'Inter',sans-serif;font-size:.8rem;font-weight:500;padding:5px 13px;
+  border-radius:7px;cursor:pointer;background:var(--card);color:var(--fg);
+  border:1px solid var(--edge);transition:border-color .15s,color .15s;}
+.btn:hover{border-color:var(--acc);color:var(--acc);}
+.btn.play{background:var(--acc);color:#fff;border-color:var(--acc);}
+.btn.stage{font-size:.74rem;padding:4px 10px;}
+.btn.stage.cur{border-color:var(--acc);color:var(--acc);}
+.sep{color:var(--dim);}
+.progress{display:flex;gap:4px;margin-bottom:8px;}
+.prog-seg{flex:1;height:3px;border-radius:2px;background:var(--dim);transition:background .3s;}
+.prog-seg.done{background:var(--done);}
+.prog-seg.active{background:var(--act);}
+.prog-seg.done-inv{background:var(--inv);}
+.prog-seg.active-inv{background:var(--inv);opacity:.6;}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:.72rem;color:var(--muted);align-items:center;}
+.leg{display:flex;align-items:center;gap:5px;}
+.leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+.leg-line{width:22px;height:2.5px;border-radius:2px;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<div class="top-row">
+  <div class="hd">
+    <h1>WHT 버터플라이 신호 흐름도 (n = 8)</h1>
+    <p class="sub">(a, b) → ((a+b)/√2, (a−b)/√2) · 역변환도 동일한 연산 — 역순으로</p>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;">
+    <div class="badge out" id="outBadge" onclick="toggleOutlier()">⚡ 아웃라이어</div>
+    <div class="badge inv" id="invBadge" onclick="toggleInverse()">↩ 역변환</div>
+  </div>
+</div>
+
+<div class="progress" id="progress">
+  <div class="prog-seg" id="ps0"></div>
+  <div class="prog-seg" id="ps1"></div>
+  <div class="prog-seg" id="ps2"></div>
+</div>
+
+<div id="cvWrap"><canvas id="cv"></canvas></div>
+<div id="info">▶ 재생 버튼을 누르거나 단계 버튼으로 이동하세요.</div>
+
+<div class="ctrls">
+  <button class="btn" onclick="goPrev()">← 이전</button>
+  <button class="btn play" id="playBtn" onclick="togglePlay()">▶ 재생</button>
+  <button class="btn" onclick="goNext()">다음 →</button>
+  <button class="btn" onclick="initVec()">🎲 새 벡터</button>
+  <span class="sep">|</span>
+  <span style="font-size:.77rem;color:var(--muted)">단계:</span>
+  <button class="btn stage" id="sb_i" onclick="setS(-1)">입력</button>
+  <button class="btn stage" id="sb_0" onclick="setS(0)">1단계</button>
+  <button class="btn stage" id="sb_1" onclick="setS(1)">2단계</button>
+  <button class="btn stage" id="sb_2" onclick="setS(2)">3단계</button>
+  <button class="btn stage" id="sb_3" onclick="setS(3)">결과</button>
+</div>
+
+<div class="legend">
+  <div class="leg"><div class="leg-dot" style="background:#60a5fa"></div>양수</div>
+  <div class="leg"><div class="leg-dot" style="background:#f87171"></div>음수</div>
+  <div class="leg"><div class="leg-line" style="background:#fbbf24"></div>순방향</div>
+  <div class="leg"><div class="leg-line" style="background:#a78bfa"></div>역방향</div>
+  <div class="leg"><div class="leg-line" style="background:rgba(52,211,153,.5)"></div>완료</div>
+  <div class="leg"><div class="leg-dot" style="background:#fb923c;border-radius:2px"></div>집중도</div>
+</div>
+
+<script>
+const N=8, LOG=3;
+let vecsFwd=[], vecsInv=[];
+let curS=-1, outlierMode=false, inverseMode=false, playing=false, timer=null;
+
+// ── WHT ──────────────────────────────────────────────
+function applyStage(x,s){
+  const y=[...x], step=1<<s, block=step*2, r2=Math.sqrt(2);
+  for(let g=0;g<N;g+=block)
+    for(let i=0;i<step;i++){
+      const a=x[g+i], b=x[g+i+step];
+      y[g+i]=(a+b)/r2; y[g+i+step]=(a-b)/r2;
+    }
+  return y;
+}
+function bfPairs(s){
+  const step=1<<s, block=step*2, p=[];
+  for(let g=0;g<N;g+=block) for(let i=0;i<step;i++) p.push([g+i,g+i+step]);
+  return p;
+}
+// 역변환에서 표시 단계 → 실제 WHT 단계 (역순)
+function realStage(ds){ return inverseMode ? (LOG-1-ds) : ds; }
+
+function peakConc(v){
+  const mx=Math.max(...v.map(Math.abs));
+  const rms=Math.sqrt(v.reduce((s,x)=>s+x*x,0)/v.length);
+  return mx/rms;
+}
+function concColor(r){
+  if(r<1.5)return '#34d399'; if(r<2.2)return '#fbbf24'; return '#f87171';
+}
+
+function initVec(){
+  let v;
+  if(outlierMode){ v=Array(N).fill(0.1); v[0]=3.0; }
+  else { v=Array.from({length:N},()=>Math.random()-0.5); }
+  const nrm=Math.hypot(...v);
+
+  // 순방향 WHT: x → Hx
+  vecsFwd=[v.map(x=>x/nrm)];
+  for(let s=0;s<LOG;s++) vecsFwd.push(applyStage(vecsFwd[s],s));
+
+  // 역방향 WHT: Hx → x  (단계를 역순으로)
+  vecsInv=[vecsFwd[LOG].slice()];
+  for(let s=LOG-1;s>=0;s--) vecsInv.push(applyStage(vecsInv[vecsInv.length-1],s));
+
+  curS=-1; render();
+}
+function curVecs(){ return inverseMode ? vecsInv : vecsFwd; }
+
+function toggleOutlier(){
+  outlierMode=!outlierMode;
+  document.getElementById('outBadge').className='badge out'+(outlierMode?' on':'');
+  initVec();
+}
+function toggleInverse(){
+  inverseMode=!inverseMode;
+  document.getElementById('invBadge').className='badge inv'+(inverseMode?' on':'');
+  curS=-1; render();
+}
+
+// ── layout ───────────────────────────────────────────
+const cv=document.getElementById('cv');
+const DPR=Math.min(window.devicePixelRatio||1,2);
+let W,H,xs,ys,R,LABEL_W,CONC_W;
+
+function resize(){
+  W=Math.max(320,document.getElementById('cvWrap').clientWidth-20);
+  LABEL_W=60; CONC_W=64;
+  R=Math.min(20,(W-LABEL_W-CONC_W)/(N*2.6));
+  H=R*2+LOG*(R*6.5)+R*2;
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  const mx=LABEL_W+R, colW=(W-mx-R-CONC_W)/(N-1);
+  xs=Array.from({length:N},(_,j)=>mx+j*colW);
+  const rowH=(H-R*4)/LOG;
+  ys=Array.from({length:LOG+1},(_,s)=>R*2+s*rowH);
+  render();
+}
+window.addEventListener('resize',resize);
+
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+// ── draw ──────────────────────────────────────────────
+function render(){
+  const vecs=curVecs();
+  if(!vecs.length) return;
+  const ctx=cv.getContext('2d');
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const allMax=Math.max(...vecs.flat().map(Math.abs),0.001);
+  const dim=cssVar('--dim'), muted=cssVar('--muted');
+
+  const FWD_LABELS=['입력 x','1단계 후','2단계 후','Hx (결과)'];
+  const INV_LABELS=['Hx (입력)','역1단계 후','역2단계 후','x (복원)'];
+  const rowLabels=inverseMode?INV_LABELS:FWD_LABELS;
+
+  // row labels
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let r=0;r<=LOG;r++){
+    ctx.font=`${Math.max(9,R*.58)}px Inter,system-ui,sans-serif`;
+    ctx.fillStyle=r<=curS+1?muted:dim;
+    ctx.fillText(rowLabels[r],LABEL_W-4,ys[r]);
+  }
+
+  // butterfly lines
+  const lineColor=inverseMode?'rgba(167,139,250,.75)':'rgba(251,191,36,.75)';
+  for(let ds=0;ds<LOG;ds++){
+    const ps=bfPairs(realStage(ds));
+    const isAct=ds===curS, isDone=ds<curS;
+    for(const [i,j] of ps){
+      const xi=xs[i],xj=xs[j],y0=ys[ds],y1=ys[ds+1];
+      const lines=[
+        {x1:xi,y1:y0,x2:xi,y2:y1,neg:false,cross:false},
+        {x1:xj,y1:y0,x2:xi,y2:y1,neg:false,cross:true},
+        {x1:xi,y1:y0,x2:xj,y2:y1,neg:false,cross:true},
+        {x1:xj,y1:y0,x2:xj,y2:y1,neg:true, cross:false},
+      ];
+      for(const l of lines){
+        ctx.beginPath(); ctx.moveTo(l.x1,l.y1); ctx.lineTo(l.x2,l.y2);
+        ctx.globalAlpha=1;
+        if(isAct){
+          ctx.strokeStyle=l.neg?'rgba(248,113,113,.7)':lineColor;
+          ctx.lineWidth=l.cross?1.8:2.2; ctx.setLineDash(l.cross?[5,3]:[]);
+        } else if(isDone){
+          ctx.strokeStyle='rgba(52,211,153,.28)'; ctx.lineWidth=1; ctx.setLineDash([]);
+        } else {
+          ctx.strokeStyle=dim; ctx.globalAlpha=.4; ctx.lineWidth=.8; ctx.setLineDash([]);
+        }
+        ctx.stroke(); ctx.globalAlpha=1; ctx.setLineDash([]);
+      }
+      if(isAct){
+        const fy=(ys[ds]+ys[ds+1])/2;
+        ctx.font=`bold ${Math.max(9,R*.65)}px Inter,system-ui,sans-serif`;
+        ctx.textBaseline='middle';
+        ctx.fillStyle='rgba(248,113,113,.9)'; ctx.textAlign='left';  ctx.fillText('−',xj+3,fy);
+        ctx.fillStyle=lineColor;              ctx.textAlign='right'; ctx.fillText('+',xi-3,fy);
+      }
+    }
+  }
+
+  // nodes
+  const outIdx=(!inverseMode && outlierMode)
+    ? vecsFwd[0].reduce((mi,v,i,a)=>Math.abs(v)>Math.abs(a[mi])?i:mi,0) : -1;
+
+  for(let row=0;row<=LOG;row++){
+    const vec=vecs[Math.min(row,vecs.length-1)];
+    const vis=row<=curS+1, isCur=row===curS+1;
+    for(let j=0;j<N;j++){
+      const x=xs[j],y=ys[row],v=vec[j];
+      const alpha=vis?0.18+0.82*Math.min(1,Math.abs(v)/allMax):0;
+      ctx.beginPath(); ctx.arc(x,y,R,0,Math.PI*2);
+      ctx.fillStyle=vis?(v>=0?`rgba(96,165,250,${alpha})`:`rgba(248,113,113,${alpha})`):dim;
+      ctx.fill();
+      ctx.strokeStyle=vis?(v>=0?'rgba(96,165,250,.7)':'rgba(248,113,113,.7)'):dim;
+      ctx.lineWidth=isCur?2.5:1.2; ctx.stroke();
+      if(vis){
+        ctx.fillStyle='rgba(255,255,255,.88)';
+        ctx.font=`600 ${Math.max(7,R*.5)}px Inter,system-ui,sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(v.toFixed(2),x,y);
+      }
+      // outlier annotation (순방향 row 0 only)
+      if(outIdx===j && row===0 && vis){
+        const ax=x,ay=y-R-4;
+        ctx.strokeStyle='#fb923c'; ctx.lineWidth=1.5; ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(ax,ay-14); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(ax-4,ay-10); ctx.lineTo(ax,ay-14); ctx.lineTo(ax+4,ay-10); ctx.stroke();
+        ctx.fillStyle='#fb923c';
+        ctx.font=`bold ${Math.max(8,R*.58)}px Inter,system-ui,sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+        ctx.fillText('아웃라이어!',ax,ay-17);
+      }
+    }
+
+    // concentration badge
+    if(vis){
+      const c=peakConc(vec);
+      ctx.font=`500 ${Math.max(8,R*.54)}px Inter,system-ui,sans-serif`;
+      ctx.textAlign='left'; ctx.textBaseline='middle';
+      ctx.fillStyle=concColor(c);
+      ctx.fillText(`집중도 ${c.toFixed(2)}`,W-CONC_W+4,ys[row]);
+    }
+
+    // 역변환 마지막 행: 원본 복원 확인
+    if(inverseMode && row===LOG && vis){
+      const orig=vecsFwd[0];
+      const recovered=vecsInv[LOG];
+      const err=Math.max(...orig.map((v,i)=>Math.abs(v-recovered[i])));
+      ctx.font=`bold ${Math.max(8,R*.54)}px Inter,system-ui,sans-serif`;
+      ctx.fillStyle='#34d399'; ctx.textAlign='center'; ctx.textBaseline='top';
+      ctx.fillText('✓ H⁻¹(Hx)=x  오차: '+err.toExponential(1),W/2,ys[LOG]+R+4);
+    }
+  }
+
+  // index labels
+  ctx.font=`${Math.max(8,R*.54)}px Inter,system-ui,sans-serif`;
+  ctx.fillStyle=dim; ctx.textAlign='center';
+  for(let j=0;j<N;j++){
+    ctx.textBaseline='alphabetic'; ctx.fillText('x'+j,xs[j],ys[0]-R-3);
+    ctx.textBaseline='top';        ctx.fillText('x'+j,xs[j],ys[LOG]+R+(inverseMode?18:3));
+  }
+
+  // energy readout
+  const ev=vecs[Math.max(0,Math.min(curS+1,LOG))];
+  const E=ev.reduce((s,v)=>s+v*v,0);
+  ctx.fillStyle=muted; ctx.font=`${Math.max(9,R*.56)}px Inter,system-ui,sans-serif`;
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillText('‖x‖² = '+E.toFixed(4)+'  (보존됨)',LABEL_W+2,H-4);
+
+  updateInfo(); updateButtons(); updateProgress();
+}
+
+// ── info text ─────────────────────────────────────────
+const INFOS_FWD=[
+  '입력: 무작위 단위 벡터 x (‖x‖²=1). 파란 원=양수, 빨간 원=음수.',
+  '1단계 — 인접 쌍 (x₀,x₁),(x₂,x₃),(x₄,x₅),(x₆,x₇) 버터플라이.',
+  '2단계 — 거리 2 쌍 (x₀,x₂),(x₁,x₃),(x₄,x₆),(x₅,x₇) 버터플라이.',
+  '3단계 — 거리 4 쌍 (x₀,x₄),(x₁,x₅),(x₂,x₆),(x₃,x₇) 버터플라이.',
+  '완성! 총 12번 연산으로 Hx 계산 (O(n log n)).',
+];
+const INFOS_OUT=[
+  '⚡ 아웃라이어 존재: x₀≈0.996, 나머지≈0.033. 집중도≈2.81 → 균일 양자화 어려움.',
+  '1단계: 에너지가 인접 쌍으로 퍼짐. 집중도 소폭 감소.',
+  '2단계: 더 넓은 범위로 에너지 분산. 집중도 계속 감소.',
+  '3단계: 모든 성분에 균등 분산 완료. 집중도≈1.23 → 아웃라이어 희석!',
+  '✅ Hx: 모든 성분이 비슷한 크기 → 균일 양자화 가능. QuIP#의 핵심!',
+];
+const INFOS_INV=[
+  'Hx를 입력으로 역변환 시작. H⁻¹=Hᵀ=H 이므로 같은 버터플라이를 역순으로 적용합니다.',
+  '역1단계 — 거리 4 쌍부터 (순방향 3단계의 역). 연산식은 (a,b)→((a+b)/√2,(a-b)/√2) 그대로!',
+  '역2단계 — 거리 2 쌍 역버터플라이. 에너지 계속 보존.',
+  '역3단계 — 인접 쌍 역버터플라이. 가장 작은 단위로 분리 완료.',
+  '✅ 완전 복원: H⁻¹(Hx) = x. 맨 아래 행이 처음 입력 x와 수치적으로 일치합니다 (부동소수점 오차 수준).',
+];
+function updateInfo(){
+  let arr=INFOS_FWD;
+  if(inverseMode) arr=INFOS_INV;
+  else if(outlierMode) arr=INFOS_OUT;
+  document.getElementById('info').textContent=arr[Math.min(curS+1,arr.length-1)];
+}
+function updateProgress(){
+  for(let i=0;i<3;i++){
+    const el=document.getElementById('ps'+i);
+    const sfx=inverseMode?'-inv':'';
+    el.className='prog-seg'+(i<curS?' done'+sfx:i===curS?' active'+sfx:'');
+  }
+}
+function updateButtons(){
+  ['sb_i','sb_0','sb_1','sb_2','sb_3'].forEach((id,k)=>{
+    const el=document.getElementById(id);
+    if(el) el.className='btn stage'+(k-1===curS?' cur':'');
+  });
+}
+
+// ── controls ─────────────────────────────────────────
+function goNext(){if(curS<LOG){curS++;render();}}
+function goPrev(){if(curS>-1){curS--;render();}}
+function setS(s){curS=s;render();}
+function togglePlay(){
+  playing=!playing;
+  document.getElementById('playBtn').textContent=playing?'⏸ 정지':'▶ 재생';
+  if(playing){if(curS>=LOG)curS=-1;tick();}
+  else clearTimeout(timer);
+}
+function tick(){
+  if(!playing)return;
+  if(curS>=LOG){playing=false;document.getElementById('playBtn').textContent='▶ 재생';return;}
+  goNext(); timer=setTimeout(tick,1400);
+}
+
+document.fonts.ready.then(function(){
+  resize();
+  initVec();
+});
+</script>
+</body>
+</html>

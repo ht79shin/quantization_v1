@@ -1,0 +1,357 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="UTF-8">
+<title>Gram-Schmidt</title>
+<style>
+:root{--bg:#0a0e1a;--card:#131929;--border:#1e2a40;--text:#e2e8f0;--muted:#64748b;--accent:#818cf8;--green:#34d399;--amber:#fbbf24;--red:#f87171;}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;}}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:18px 20px;min-height:100vh;}
+h1{font-size:1.2rem;font-weight:700;margin-bottom:3px;}
+.sub{color:var(--muted);font-size:0.8rem;margin-bottom:14px;}
+.top-ctrl{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.top-ctrl label{color:var(--muted);font-size:0.83rem;}
+select,select option{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:5px;padding:3px 8px;font-size:0.83rem;}
+.btn{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 13px;font-size:0.83rem;cursor:pointer;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.play{background:var(--accent);color:#fff;border-color:var(--accent);}
+.main{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.panel h3{font-size:0.85rem;font-weight:600;align-self:flex-start;}
+canvas{border-radius:6px;}
+.step-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:12px;}
+.step-title{font-size:0.75rem;color:var(--muted);margin-bottom:4px;}
+.step-desc{font-size:0.9rem;font-weight:500;min-height:1.4em;}
+.dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border);cursor:pointer;transition:background .2s;}
+.dot.active{background:var(--accent);}
+.dot.done{background:var(--green);}
+.ctrls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.phase-badge{font-size:0.75rem;padding:2px 10px;border-radius:12px;font-weight:600;margin-left:auto;}
+.phase-badge.init{background:rgba(129,140,248,.15);color:var(--accent);}
+.phase-badge.project{background:rgba(251,191,36,.15);color:var(--amber);}
+.phase-badge.orth{background:rgba(248,113,113,.15);color:var(--red);}
+.phase-badge.norm{background:rgba(52,211,153,.15);color:var(--green);}
+.phase-badge.done{background:rgba(52,211,153,.2);color:var(--green);}
+.legend{font-size:0.72rem;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;}
+.leg-item{display:flex;align-items:center;gap:5px;}
+.leg-dot{width:10px;height:10px;border-radius:50%;}
+@media(max-width:580px){.main{grid-template-columns:1fr;}}
+</style>
+
+<h1>Gram-Schmidt 직교화 — 무작위 직교행렬 생성 과정</h1>
+<p class="sub">무작위 가우시안 열벡터들을 단계적으로 직교 정규화하여 직교행렬 Q를 만드는 과정</p>
+
+<div class="top-ctrl">
+  <label>행렬 크기:</label>
+  <select id="nSel" onchange="init()">
+    <option value="2" selected>n = 2 (기하학적 뷰)</option>
+    <option value="3">n = 3</option>
+    <option value="4">n = 4</option>
+  </select>
+  <button class="btn" onclick="init()">🎲 새 행렬 생성</button>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:#818cf8"></div>열 1</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#34d399"></div>열 2</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#fbbf24"></div>열 3</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#f87171"></div>열 4</div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="panel" id="geo-panel">
+    <h3>기하학적 뷰 (첫 2차원)</h3>
+    <canvas id="geoC" width="300" height="300"></canvas>
+  </div>
+  <div class="panel">
+    <h3>행렬 항목 변화 |M<sub>ij</sub>|</h3>
+    <canvas id="matC" width="300" height="300"></canvas>
+  </div>
+</div>
+
+<div class="step-box">
+  <div style="display:flex;align-items:center;gap:8px;">
+    <div class="step-title" id="stepNum">단계 1 / ?</div>
+    <div class="phase-badge init" id="phaseBadge">초기</div>
+  </div>
+  <div class="step-desc" id="stepDesc">...</div>
+  <div class="dots" id="dots"></div>
+</div>
+
+<div class="ctrls">
+  <button class="btn" onclick="goPrev()">← 이전</button>
+  <button class="btn play" id="playBtn" onclick="togglePlay()">▶ 재생</button>
+  <button class="btn" onclick="goNext()">다음 →</button>
+  <label style="font-size:0.82rem;color:var(--muted);margin-left:8px;">
+    속도 <input type="range" id="spd" min="300" max="1800" value="900" step="300" style="width:80px;accent-color:var(--accent)">
+  </label>
+</div>
+
+<script>
+// --- Math ---
+function gauss(){let u,v;do{u=Math.random();}while(!u);do{v=Math.random();}while(!v);return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+function dot(a,b){return a.reduce((s,x,i)=>s+x*b[i],0);}
+function norm(v){return Math.sqrt(dot(v,v));}
+function scale(v,s){return v.map(x=>x*s);}
+function sub(a,b){return a.map((x,i)=>x-b[i]);}
+function add(a,b){return a.map((x,i)=>x+b[i]);}
+function normalize(v){const n=norm(v);return v.map(x=>x/n);}
+function deepCopy(M){return M.map(r=>[...r]);}
+function getCol(M,j){return M.map(r=>r[j]);}
+function setCol(M,j,v){return M.map((r,i)=>r.map((x,c)=>c===j?v[i]:x));}
+function computeMu(M,n){let mx=0;for(let r=0;r<n;r++)for(let c=0;c<n;c++)mx=Math.max(mx,Math.abs(M[r][c]));return mx*Math.sqrt(n);}
+
+function generateSteps(M0,n){
+  const steps=[];
+  let M=deepCopy(M0);
+  const COLS=['v₁','v₂','v₃','v₄'];
+  const QS=['q₁','q₂','q₃','q₄'];
+
+  steps.push({M:deepCopy(M),desc:`초기 무작위 가우시안 행렬 M (열벡터 ${COLS.slice(0,n).join(', ')}가 비직교 상태)`,phase:'init',activeCol:-1,projVec:null,projOnto:null,subFrom:null});
+
+  for(let j=0;j<n;j++){
+    for(let k=0;k<j;k++){
+      const qk=getCol(M,k);
+      const vj=getCol(M,j);
+      const ps=dot(vj,qk);
+      const proj=scale(qk,ps);
+      steps.push({M:deepCopy(M),desc:`${COLS[j]}: ${QS[k]}에 대한 사영(projection) 계산 → p = (${COLS[j]}·${QS[k]})${QS[k]}`,phase:'project',activeCol:j,projVec:proj,projOnto:qk,subFrom:null});
+      M=setCol(M,j,sub(vj,proj));
+      steps.push({M:deepCopy(M),desc:`${COLS[j]} ← ${COLS[j]} − p (사영 성분 제거 → ${QS[k]}와 직교)`,phase:'orth',activeCol:j,projVec:null,projOnto:null,subFrom:null});
+    }
+    M=setCol(M,j,normalize(getCol(M,j)));
+    steps.push({M:deepCopy(M),desc:`${COLS[j]} 정규화 → ${QS[j]} (‖${QS[j]}‖ = 1)`,phase:'norm',activeCol:j,projVec:null,projOnto:null,subFrom:null});
+  }
+
+  const mu=computeMu(M,n);
+  steps.push({M:deepCopy(M),desc:`완성! Q = [${QS.slice(0,n).join(', ')}]  QᵀQ = I ✓   μ = max|Qᵢⱼ|×√n ≈ ${mu.toFixed(2)}`,phase:'done',activeCol:-1,projVec:null,projOnto:null,subFrom:null});
+  return steps;
+}
+
+// --- Drawing ---
+const COLORS=['#818cf8','#34d399','#fbbf24','#f87171'];
+const PHASE_LABELS={init:'초기 상태',project:'사영(Projection)',orth:'직교화',norm:'정규화',done:'완성 ✓'};
+const PHASE_CLASSES={init:'init',project:'project',orth:'orth',norm:'norm',done:'done'};
+
+function drawArrow(ctx,x1,y1,x2,y2,color,dashed,width){
+  ctx.save();
+  ctx.strokeStyle=color; ctx.fillStyle=color;
+  ctx.lineWidth=width||2.5;
+  if(dashed) ctx.setLineDash([6,4]); else ctx.setLineDash([]);
+  const dx=x2-x1,dy=y2-y1;
+  const len=Math.sqrt(dx*dx+dy*dy);
+  if(len<2){ctx.restore();return;}
+  const ux=dx/len,uy=dy/len;
+  const hw=width?width*2.5:7,hl=width?width*4:12;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2-ux*hl,y2-uy*hl);ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-ux*hl-uy*hw,y2-uy*hl+ux*hw);
+  ctx.lineTo(x2-ux*hl+uy*hw,y2-uy*hl-ux*hw);
+  ctx.closePath();ctx.fill();
+  ctx.restore();
+}
+
+function drawRightAngle(ctx,x,y,ux,uy,size,color){
+  const px=-uy,py=ux;
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x+ux*size,y+uy*size);
+  ctx.lineTo(x+ux*size+px*size,y+uy*size+py*size);
+  ctx.lineTo(x+px*size,y+py*size);
+  ctx.stroke();ctx.restore();
+}
+
+function drawGeo(step,n){
+  const cv=document.getElementById('geoC');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  const cx=W/2,cy=H/2,sc=110;
+  ctx.clearRect(0,0,W,H);
+
+  // Background grid
+  ctx.strokeStyle='#1e2a40';ctx.lineWidth=1;ctx.setLineDash([2,4]);
+  for(let g=-2;g<=2;g++){
+    ctx.beginPath();ctx.moveTo(cx+g*sc,0);ctx.lineTo(cx+g*sc,H);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,cy+g*sc);ctx.lineTo(W,cy+g*sc);ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // Unit circle
+  ctx.strokeStyle='#2a3a55';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(cx,cy,sc,0,Math.PI*2);ctx.stroke();
+
+  // Axes
+  ctx.strokeStyle='#334155';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();
+  ctx.fillStyle='#64748b';ctx.font='11px sans-serif';
+  ctx.fillText('1',cx+sc+2,cy-4);ctx.fillText('-1',cx-sc-18,cy-4);
+  ctx.fillText('1',cx+4,cy-sc+2);ctx.fillText('-1',cx+4,cy+sc+4);
+
+  const M=step.M;
+  const nCols=Math.min(n,4);
+
+  // Draw original M0 vectors faded (first step only shows them normally)
+  // Draw projection if applicable
+  if(step.projVec && step.projOnto){
+    const pv=step.projVec; // projection vector (2D: first 2 components)
+    const px=pv[0]||0, py=pv[1]||0;
+    // Draw projection endpoint
+    ctx.save();
+    ctx.strokeStyle='#fbbf24';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    // vertical/perpendicular dashed line from active col tip to projection
+    const j=step.activeCol;
+    const vj=[M[0][j]||0,M[1]?M[1][j]||0:0];
+    const vjx=cx+vj[0]*sc, vjy=cy-vj[1]*sc;
+    const ppx=cx+px*sc, ppy=cy-py*sc;
+    ctx.moveTo(vjx,vjy);ctx.lineTo(ppx,ppy);ctx.stroke();
+    ctx.setLineDash([]);ctx.restore();
+    // Draw projection arrow
+    drawArrow(ctx,cx,cy,ppx,ppy,'#fbbf24',false,2);
+    ctx.fillStyle='#fbbf24';ctx.font='bold 12px sans-serif';
+    ctx.fillText('p',ppx+5,ppy-5);
+  }
+
+  // Draw column vectors
+  for(let j=0;j<nCols;j++){
+    const vx=M[0][j]||0;
+    const vy=(M[1]&&M[1][j]!=null)?M[1][j]:0;
+    const ex=cx+vx*sc, ey=cy-vy*sc;
+    const col=COLORS[j];
+    const isActive=step.activeCol===j;
+    const alpha=isActive?1:0.65;
+    const lw=isActive?3:2;
+    drawArrow(ctx,cx,cy,ex,ey,col,false,lw);
+    // Label
+    ctx.fillStyle=col;ctx.font=`bold ${isActive?14:12}px sans-serif`;
+    const label=step.phase==='done'?['q₁','q₂','q₃','q₄'][j]:['v₁','v₂','v₃','v₄'][j];
+    ctx.fillText(label,ex+6,ey-6);
+  }
+
+  // Right angle mark if orthogonalized
+  if((step.phase==='orth'||step.phase==='norm'||step.phase==='done')&&n>=2&&step.activeCol>=1){
+    const j=step.activeCol;
+    const vx=M[0][j]||0, vy=(M[1]&&M[1][j]!=null)?M[1][j]:0;
+    const nrm=Math.sqrt(vx*vx+vy*vy);
+    if(nrm>0.01) drawRightAngle(ctx,cx,cy,vx/nrm,-(vy/nrm),12,'#34d399');
+  }
+
+  // μ display
+  if(step.phase==='done'){
+    const mu=computeMu(M,n);
+    ctx.fillStyle='#34d399';ctx.font='13px sans-serif';
+    ctx.fillText(`μ = ${mu.toFixed(2)}  (이상적: 1.00)`,8,H-8);
+  }
+}
+
+function cellColor(v,maxRef){
+  const t=Math.min(1,Math.abs(v)/maxRef);
+  if(t<0.33){const p=t/0.33;return `rgb(${Math.round(10+p*60)},${Math.round(14+p*10)},${Math.round(100+p*100)})`;}
+  if(t<0.66){const p=(t-0.33)/0.33;return `rgb(${Math.round(70+p*160)},${Math.round(24+p*20)},${Math.round(200-p*120)})`;}
+  const p=(t-0.66)/0.34;return `rgb(${Math.round(230+p*25)},${Math.round(44+p*170)},${Math.round(80-p*70)})`;
+}
+
+function drawMat(step,n){
+  const cv=document.getElementById('matC');
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  ctx.clearRect(0,0,W,H);
+  const M=step.M;
+  const pad=24,cw=(W-pad*2)/n,ch=(H-pad*2)/n;
+  const maxRef=1/Math.sqrt(n)*1.6||1;
+
+  for(let r=0;r<n;r++){
+    for(let c=0;c<n;c++){
+      const v=M[r][c];
+      const x=pad+c*cw,y=pad+r*ch;
+      ctx.fillStyle=cellColor(v,maxRef);
+      ctx.fillRect(x+1,y+1,cw-2,ch-2);
+
+      // Active column highlight
+      if(c===step.activeCol){
+        ctx.strokeStyle='#fff';ctx.lineWidth=2;
+        ctx.strokeRect(x+1,y+1,cw-2,ch-2);
+      }
+
+      // Value text
+      ctx.fillStyle='#fff';
+      ctx.font=`bold ${Math.max(10,Math.round(cw*0.28))}px sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(v.toFixed(2),x+cw/2,y+ch/2);
+    }
+  }
+
+  // Column labels
+  ctx.fillStyle='#64748b';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+  for(let c=0;c<n;c++){
+    const lbl=step.phase==='done'?['q₁','q₂','q₃','q₄'][c]:['v₁','v₂','v₃','v₄'][c];
+    ctx.fillStyle=COLORS[c];
+    ctx.fillText(lbl,pad+c*cw+cw/2,2);
+  }
+
+  // μ value
+  const mu=computeMu(M,n);
+  ctx.fillStyle='#64748b';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText(`μ = ${mu.toFixed(3)}`,pad,H-4);
+  // Ideal reference
+  ctx.fillStyle='#34d399';
+  ctx.fillText(`이상 하한: 1.000`,pad+100,H-4);
+}
+
+// --- State ---
+let steps=[], curStep=0, playing=false, timer=null, N=2;
+
+function render(){
+  const s=steps[curStep];
+  drawMat(s,N);
+  if(N===2) drawGeo(s,N);
+  document.getElementById('stepDesc').textContent=s.desc;
+  document.getElementById('stepNum').textContent=`단계 ${curStep+1} / ${steps.length}`;
+  const pb=document.getElementById('phaseBadge');
+  pb.textContent=PHASE_LABELS[s.phase]||s.phase;
+  pb.className='phase-badge '+(PHASE_CLASSES[s.phase]||'init');
+  // Dots
+  const dc=document.getElementById('dots');
+  dc.innerHTML='';
+  steps.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(i<curStep?' done':i===curStep?' active':'');
+    d.onclick=()=>{curStep=i;render();};
+    dc.appendChild(d);
+  });
+}
+
+function goNext(){if(curStep<steps.length-1){curStep++;render();}}
+function goPrev(){if(curStep>0){curStep--;render();}}
+function togglePlay(){
+  playing=!playing;
+  document.getElementById('playBtn').textContent=playing?'⏸ 정지':'▶ 재생';
+  if(playing) tick();
+  else clearTimeout(timer);
+}
+function tick(){
+  if(!playing) return;
+  if(curStep>=steps.length-1){playing=false;document.getElementById('playBtn').textContent='▶ 재생';return;}
+  goNext();
+  const delay=1800-parseInt(document.getElementById('spd').value);
+  timer=setTimeout(tick,Math.max(300,delay));
+}
+
+function init(){
+  clearTimeout(timer);playing=false;
+  document.getElementById('playBtn').textContent='▶ 재생';
+  N=parseInt(document.getElementById('nSel').value);
+  document.getElementById('geo-panel').style.display=N===2?'':'none';
+  // Build random matrix
+  const M0=[];
+  for(let r=0;r<N;r++){M0.push([]);for(let c=0;c<N;c++)M0[r].push(gauss());}
+  steps=generateSteps(M0,N);
+  curStep=0;
+  render();
+}
+
+init();
+</script>
+
+</body></html>

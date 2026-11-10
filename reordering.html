@@ -1,0 +1,425 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>채널 재배열 보정</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+:root {
+  --bg:#0d1117;--card:#161b22;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;
+  --accent:#58a6ff;--red:#f85149;--orange:#e3b341;
+  --green:#3fb950;--purple:#bc8cff;
+  color-scheme:dark;
+}
+@media(prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){
+    --bg:#ffffff;--card:#f6f8fa;--border:#d0d7de;
+    --text:#1f2328;--muted:#57606a;
+    --accent:#0969da;--red:#cf222e;--orange:#953800;
+    --green:#116329;--purple:#8250df;
+    color-scheme:light;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117;--card:#161b22;--border:#30363d;
+  --text:#e6edf3;--muted:#8b949e;
+  --accent:#58a6ff;--red:#f85149;--orange:#e3b341;
+  --green:#3fb950;--purple:#bc8cff;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:20px;
+}
+#app{max-width:960px;margin:0 auto}
+h1{font-size:1.2rem;font-weight:700;margin-bottom:3px}
+.sub{font-size:.8rem;color:var(--muted);margin-bottom:16px}
+
+.step-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.pill{padding:4px 11px;border-radius:20px;font-size:.72rem;border:1px solid var(--border);color:var(--muted);cursor:pointer;transition:.2s;white-space:nowrap;user-select:none}
+.pill.active{background:var(--accent);border-color:var(--accent);color:#000;font-weight:700}
+.pill:hover:not(.active){border-color:var(--accent);color:var(--accent)}
+
+.viz{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:14px;overflow-x:auto}
+
+.mat-title{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
+.mat-wrap{display:inline-flex;flex-direction:column;gap:2px}
+.mat-row{display:flex;gap:2px;align-items:center}
+.rlbl{width:30px;font-size:.6rem;color:var(--muted);text-align:right;padding-right:5px;flex-shrink:0}
+.clbl-row{display:flex;gap:2px;margin-bottom:3px}
+.clbl{width:36px;text-align:center;font-size:.58rem;color:var(--muted)}
+.clbl.oc{color:var(--red);font-weight:700}
+.cell{width:36px;height:28px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-family:'Courier New',monospace;font-weight:600;transition:background .4s,color .4s;cursor:default}
+.cell.oc{box-shadow:0 0 0 2px var(--red)}
+
+.grp-row{display:flex;gap:2px;margin-top:3px;padding-left:35px}
+.grp-box{flex:1;border-radius:4px;padding:2px 0;text-align:center;font-size:.58rem;font-weight:700}
+
+.bar-section{margin-top:12px}
+.bars{display:flex;gap:2px;align-items:flex-end;height:80px;padding-left:35px}
+.bw{width:36px;display:flex;flex-direction:column;align-items:center;gap:1px}
+.bv{font-size:.56rem;color:var(--muted);height:14px;line-height:14px;text-align:center}
+.bar{width:32px;border-radius:3px 3px 0 0;transition:height .5s ease;min-height:2px}
+
+.p-row{display:flex;gap:5px;flex-wrap:wrap;padding-left:35px;margin-top:8px}
+.p-item{display:flex;flex-direction:column;align-items:center;gap:1px;padding:4px 5px;border-radius:5px;min-width:38px;border:1px solid var(--border)}
+.p-item.oc{border-color:var(--red);background:rgba(248,81,73,.08)}
+.p-pos{font-size:.56rem;color:var(--muted)}
+.p-ch{font-size:.82rem;font-family:monospace;font-weight:700}
+.p-sum{font-size:.56rem;color:var(--muted)}
+
+.rng-chart{margin-top:14px}
+.rng-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.rng-lbl{font-size:.68rem;width:52px;flex-shrink:0}
+.rng-bg{flex:1;height:14px;background:var(--border);border-radius:3px;overflow:hidden}
+.rng-fill{height:100%;border-radius:3px;transition:width .6s}
+.rng-val{font-size:.68rem;font-family:monospace;width:34px;text-align:right}
+
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:680px){.cmp{grid-template-columns:1fr}}
+.cmp-title{font-size:.72rem;font-weight:700;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
+
+.side{display:grid;grid-template-columns:1fr 220px;gap:16px}
+@media(max-width:680px){.side{grid-template-columns:1fr}}
+.ipanel{display:flex;flex-direction:column;gap:10px}
+.icard{background:rgba(0,0,0,.2);border:1px solid var(--border);border-radius:8px;padding:11px;font-size:.72rem}
+.icard-t{font-size:.62rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:5px}
+.stat{font-size:1.3rem;font-weight:700;color:var(--accent)}
+.stat.red{color:var(--red)}
+.stat.green{color:var(--green)}
+
+.hbox{background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.25);border-radius:8px;padding:10px 13px;margin-top:12px;font-size:.76rem;line-height:1.6}
+.hbox strong{color:var(--accent)}
+.formula{background:rgba(0,0,0,.25);border-left:3px solid var(--accent);padding:8px 11px;margin:8px 0;font-size:.75rem;font-family:'Courier New',monospace;line-height:1.6}
+
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+@media(max-width:500px){.stats-row{grid-template-columns:1fr 1fr}}
+
+.nav{display:flex;align-items:center;gap:10px}
+.btn{padding:7px 18px;border-radius:7px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;font-size:.82rem;transition:.2s;flex-shrink:0}
+.btn:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.3;cursor:not-allowed}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#000;font-weight:600}
+.btn.pri:hover:not(:disabled){opacity:.85;color:#000}
+.sdesc{flex:1;text-align:center;font-size:.75rem;color:var(--muted);line-height:1.5}
+
+/* Reshape step specific */
+.reshape-grid{display:grid;grid-template-columns:auto 48px 1fr;gap:14px;align-items:center}
+@media(max-width:620px){.reshape-grid{grid-template-columns:1fr;gap:10px}}
+.head-block{border:1px solid var(--border);border-radius:5px;padding:6px}
+.batch-block{border:1px solid var(--border);border-radius:7px;padding:9px}
+.batch-block + .batch-block{margin-top:8px}
+.dim-label{font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:3px;display:inline-block;margin-bottom:4px}
+</style>
+
+<div id="app">
+  <h1>Channel Reordering Calibration</h1>
+  <p class="sub">Algorithm 1 — RotateKV 채널 재배열 보정 알고리즘 단계별 시각화</p>
+  <div class="step-bar" id="stepBar"></div>
+  <div class="viz" id="viz"></div>
+  <div class="nav">
+    <button class="btn" id="prevBtn" onclick="go(cur-1)">← 이전</button>
+    <span class="sdesc" id="sdesc"></span>
+    <button class="btn pri" id="nextBtn" onclick="go(cur+1)">다음 →</button>
+  </div>
+</div>
+
+<script>
+const T=8, C=12, GS=4, OC=[1,5,9];
+let seed=42;
+function rng(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+
+const K=(()=>{seed=42;return Array.from({length:T},(_,t)=>Array.from({length:C},(_,c)=>OC.includes(c)?+(rng()*6+7).toFixed(1):+(rng()*1.5+.3).toFixed(1)))})();
+const SUM=Array.from({length:C},(_,c)=>+K.reduce((s,r)=>s+r[c],0).toFixed(1));
+const P=SUM.map((v,i)=>[v,i]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+const KR=K.map(r=>P.map(c=>r[c]));
+
+const allV=K.flat(),gMin=Math.min(...allV),gMax=Math.max(...allV);
+function col(v){
+  const t=(v-gMin)/(gMax-gMin);
+  if(t<.5){const s=t*2;return`rgb(${Math.round(59+s*(255-59))},${Math.round(130+s*(220-130))},${Math.round(246+s*(80-246))})`}
+  const s=(t-.5)*2;return`rgb(255,${Math.round(220-s*220)},${Math.round(80-s*80)})`;
+}
+function fg(v){const t=(v-gMin)/(gMax-gMin);return(t>.25&&t<.75)?'#111':'#fff'}
+
+function grpRanges(mat){
+  const ng=Math.ceil(mat[0].length/GS),res=[];
+  for(let g=0;g<ng;g++){
+    let mn=Infinity,mx=-Infinity;
+    for(let r=0;r<mat.length;r++)for(let c=g*GS;c<Math.min((g+1)*GS,mat[0].length);c++){mn=Math.min(mn,mat[r][c]);mx=Math.max(mx,mat[r][c])}
+    res.push({range:+(mx-mn).toFixed(2),mn:+mn.toFixed(2),mx:+mx.toFixed(2)});
+  }
+  return res;
+}
+
+function matHTML(mat,hlCols=[],grpLines=false,title=''){
+  const nc=mat[0].length;
+  let h=title?`<div class="mat-title">${title}</div>`:'';
+  h+=`<div class="mat-wrap">`;
+  h+=`<div class="clbl-row"><div class="rlbl"></div>`;
+  for(let c=0;c<nc;c++)h+=`<div class="clbl${hlCols.includes(c)?' oc':''}">ch${c}</div>`;
+  h+=`</div>`;
+  for(let t=0;t<mat.length;t++){
+    h+=`<div class="mat-row"><div class="rlbl">t${t}</div>`;
+    for(let c=0;c<mat[t].length;c++){const v=mat[t][c];h+=`<div class="cell${hlCols.includes(c)?' oc':''}" style="background:${col(v)};color:${fg(v)}">${v}</div>`}
+    h+=`</div>`;
+  }
+  h+=`</div>`;
+  if(grpLines){
+    const gc=['rgba(88,166,255,.18)','rgba(63,185,80,.18)','rgba(188,140,255,.18)'];
+    const gcb=['rgba(88,166,255,.5)','rgba(63,185,80,.5)','rgba(188,140,255,.5)'];
+    h+=`<div class="grp-row">`;
+    const ng=Math.ceil(nc/GS);
+    for(let g=0;g<ng;g++)h+=`<div class="grp-box" style="background:${gc[g]};border:1px solid ${gcb[g]};color:var(--text)">G${g+1}</div>`;
+    h+=`</div>`;
+  }
+  return h;
+}
+
+function barHTML(vals,title,hlCols=[]){
+  const mx=Math.max(...vals);
+  let h=`<div class="bar-section"><div class="mat-title">${title}</div>`;
+  h+=`<div class="bars">`;
+  vals.forEach((v,i)=>{
+    const ht=Math.max(4,Math.round(v/mx*62));
+    const isH=hlCols.includes(i);
+    h+=`<div class="bw"><div class="bv" style="color:${isH?'var(--red)':'var(--muted)'}">${v.toFixed(0)}</div><div class="bar" style="height:${ht}px;background:${isH?'var(--red)':'var(--accent)'}"></div></div>`;
+  });
+  h+=`</div></div>`;return h;
+}
+
+// ── Reshape visualization (Step 0) ──────────────────────────────────────────
+function reshapeHTML(){
+  const B=2, H=3, S=4, D=4;
+  const HC=['#58a6ff','#3fb950','#bc8cff'];  // head colors
+
+  // 4D side: b batches × h heads × s tokens × d dims
+  let left='';
+  for(let b=0;b<B;b++){
+    left+=`<div class="batch-block">`;
+    left+=`<div style="font-size:.6rem;color:var(--muted);margin-bottom:6px;font-weight:600">Batch ${b}</div>`;
+    left+=`<div style="display:flex;gap:10px">`;
+    for(let h=0;h<H;h++){
+      left+=`<div class="head-block" style="border-color:${HC[h]}55">`;
+      left+=`<div class="dim-label" style="background:${HC[h]}22;color:${HC[h]}">Head ${h}</div>`;
+      // s×d mini grid
+      left+=`<div style="display:flex;flex-direction:column;gap:1px">`;
+      for(let s=0;s<S;s++){
+        left+=`<div style="display:flex;gap:1px">`;
+        for(let d=0;d<D;d++){
+          const v=K[b*S+s][h*D+d];
+          left+=`<div style="width:21px;height:17px;border-radius:2px;background:${col(v)};display:flex;align-items:center;justify-content:center;font-size:.48rem;font-family:monospace;font-weight:600;color:${fg(v)}">${v}</div>`;
+        }
+        left+=`</div>`;
+      }
+      left+=`</div></div>`;
+    }
+    left+=`</div></div>`;
+  }
+
+  // Dimension labels for 4D
+  left = `
+    <div class="mat-title">K ∈ ℝ<sup>b×h×s×d</sup> = ℝ<sup>2×3×4×4</sup></div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+      <span style="font-size:.62rem;padding:2px 7px;border-radius:3px;background:rgba(88,166,255,.12);border:1px solid rgba(88,166,255,.3);color:var(--accent)">b=2 batches</span>
+      <span style="font-size:.62rem;padding:2px 7px;border-radius:3px;background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3);color:var(--green)">h=3 heads</span>
+      <span style="font-size:.62rem;padding:2px 7px;border-radius:3px;background:rgba(188,140,255,.12);border:1px solid rgba(188,140,255,.3);color:var(--purple)">s=4 tokens</span>
+      <span style="font-size:.62rem;padding:2px 7px;border-radius:3px;background:rgba(227,179,65,.12);border:1px solid rgba(227,179,65,.3);color:var(--orange)">d=4 dims</span>
+    </div>
+  ` + left;
+
+  // 2D side: (b×s) rows × (h×d) cols
+  // Column header: show head group for each column
+  let right=`<div class="mat-title">K ∈ ℝ<sup>(b×s)×(h×d)</sup> = ℝ<sup>8×12</sup></div>`;
+
+  // Head group bars above columns
+  right+=`<div style="display:flex;gap:1px;padding-left:34px;margin-bottom:3px">`;
+  for(let h=0;h<H;h++){
+    for(let d=0;d<D;d++){
+      right+=`<div style="width:21px;height:14px;border-radius:2px 2px 0 0;border-top:3px solid ${HC[h]};background:${HC[h]}22;font-size:.44rem;text-align:center;line-height:12px;color:${HC[h]};font-weight:700">h${h}</div>`;
+    }
+  }
+  right+=`</div>`;
+
+  // Rows: b×s
+  right+=`<div style="display:flex;flex-direction:column;gap:1px">`;
+  for(let t=0;t<T;t++){
+    const b=Math.floor(t/S), s=t%S;
+    const isFirstOfBatch=s===0;
+    right+=`<div style="display:flex;gap:1px;align-items:center${isFirstOfBatch&&t>0?';margin-top:4px':''}">`;
+    right+=`<div style="width:32px;font-size:.5rem;color:${b===0?'var(--accent)':'var(--purple)'};text-align:right;padding-right:4px;flex-shrink:0;font-weight:600">b${b}s${s}</div>`;
+    for(let c=0;c<C;c++){
+      const h=Math.floor(c/D);
+      const v=K[t][c];
+      right+=`<div style="width:21px;height:17px;border-radius:2px;background:${col(v)};display:flex;align-items:center;justify-content:center;font-size:.47rem;font-family:monospace;font-weight:600;color:${fg(v)};outline:1.5px solid ${HC[h]}55;outline-offset:-1px">${v}</div>`;
+    }
+    right+=`</div>`;
+  }
+  right+=`</div>`;
+
+  // Batch separator label
+  right=right.replace('margin-top:4px','margin-top:4px;border-top:1px dashed var(--border);padding-top:4px');
+
+  return `
+    <div class="reshape-grid">
+      <div>${left}</div>
+      <div style="text-align:center;font-size:.6rem;color:var(--muted)">
+        <div style="font-size:.7rem;font-weight:700;color:var(--accent);margin-bottom:2px">① permute</div>
+        <div style="font-size:.58rem;margin-bottom:2px">(0,2,1,3)</div>
+        <div style="font-size:1.6rem;color:var(--accent);line-height:1">→</div>
+        <div style="margin-top:10px;font-size:.7rem;font-weight:700;color:var(--green);margin-bottom:2px">② reshape</div>
+        <div style="font-size:.58rem;margin-bottom:2px">b×s, h×d</div>
+        <div style="font-size:1.6rem;color:var(--green);line-height:1">→</div>
+      </div>
+      <div>${right}</div>
+    </div>
+    <div class="hbox" style="margin-top:12px;font-size:.76rem">
+      <strong>행(Row):</strong> b×s — batch(2) × sequence(4) = 8개 토큰 행 &nbsp;|&nbsp;
+      <strong>열(Col):</strong> h×d — head(3) × head_dim(4) = 12개 채널 열<br>
+      열 위 색상 바 = head 소속 (파랑=h0, 초록=h1, 보라=h2)
+    </div>
+    <div style="margin-top:10px;background:rgba(0,0,0,.28);border:1px solid var(--border);border-radius:8px;padding:11px 14px">
+      <div style="font-size:.63rem;font-weight:700;color:var(--muted);letter-spacing:.06em;margin-bottom:7px">실제 PyTorch 코드 — 단순 reshape만으로는 불충분</div>
+      <pre style="font-size:.73rem;font-family:'Courier New',monospace;line-height:2;margin:0;overflow-x:auto"><span style="color:var(--muted)"># K shape: (b=2, h=3, s=4, d=4)  메모리 순서: b &gt; h &gt; s &gt; d</span>
+K = K.<span style="color:var(--accent);font-weight:700">permute(0, 2, 1, 3)</span>  <span style="color:var(--muted)"># ① (b,h,s,d) → (b,s,h,d)  — h↔s 축 교환</span>
+K = K.<span style="color:var(--green);font-weight:700">reshape(b*s, h*d)</span>   <span style="color:var(--muted)"># ② (b,s,h,d) → (8, 12)    — 앞두·뒷두 차원씩 합침</span></pre>
+      <div style="margin-top:9px;padding-top:9px;border-top:1px solid var(--border);font-size:.7rem;color:var(--muted);line-height:1.75">
+        <span style="color:var(--red);font-weight:700">⚠ permute 없이 reshape만 하면?</span><br>
+        (b, <u>h</u>, s, d) → reshape(8,12) : 행 = b×<u>h</u> <em>(batch-head 쌍)</em>, 열 = s×d <em>(token-dim 쌍)</em> → 채널 순서 뒤섞임 ✗<br>
+        permute 후 (b, <u>s</u>, h, d) → reshape(8,12) : 행 = b×<u>s</u> = <strong>토큰</strong>, 열 = h×d = <strong>채널</strong> ✓
+      </div>
+    </div>`;
+}
+
+const newOC=P.map((orig,ni)=>OC.includes(orig)?ni:-1).filter(i=>i>=0);
+const GC=['#58a6ff','#3fb950','#bc8cff'];
+const rngB=grpRanges(K), rngA=grpRanges(KR);
+const mx=Math.max(...rngB.map(r=>r.range),...rngA.map(r=>r.range));
+const totB=+rngB.reduce((s,r)=>s+r.range,0).toFixed(1);
+const totA=+rngA.reduce((s,r)=>s+r.range,0).toFixed(1);
+const redPct=Math.round((1-totA/totB)*100);
+
+const STEPS=[
+  {label:'Step 0',title:'Reshape: 4D → 2D'},
+  {label:'Step 1',title:'원본 Key 행렬'},
+  {label:'Step 2',title:'channel_sum 계산'},
+  {label:'Step 3',title:'argsort → P_l'},
+  {label:'Step 4',title:'채널 재배열'},
+  {label:'Step 5',title:'양자화 오차 비교'},
+];
+const DESCS=[
+  'Algorithm 첫 번째 과정: b×h×s×d 형태의 4D Key 텐서를 (b×s)×(h×d) 형태의 2D 행렬로 reshape합니다. 열 = 채널.',
+  'calibration 데이터의 Key 행렬 K ∈ ℝ^{tokens×channels}. 빨간 테두리 = 아웃라이어 채널 (ch1, ch5, ch9).',
+  '각 채널(열)의 모든 토큰 값을 합산 → channel_sum 벡터. 아웃라이어 채널의 합계가 압도적으로 큽니다.',
+  'channel_sum을 오름차순 정렬하여 재배열 인덱스 P_l을 구합니다. 아웃라이어 채널이 뒤로 밀립니다.',
+  'P_l을 적용해 열 순서를 재배열합니다. 비슷한 크기의 채널끼리 모입니다.',
+  '그룹별 양자화 범위(max−min) 비교. 재배열 후 각 그룹 내 범위가 대폭 감소합니다.',
+];
+
+let cur=0;
+
+function renderStep(){
+  const v=document.getElementById('viz');
+  if(cur===0){
+    v.innerHTML=reshapeHTML();
+  } else if(cur===1){
+    v.innerHTML=`<div class="side">
+      <div>${matHTML(K,OC,false,'K ∈ ℝ^{8×12}')}</div>
+      <div class="ipanel">
+        <div class="icard"><div class="icard-t">행렬 크기</div><div class="stat">${T} × ${C}</div><div style="font-size:.7rem;color:var(--muted);margin-top:3px">${T} tokens × ${C} channels</div></div>
+        <div class="icard"><div class="icard-t">아웃라이어 채널</div><div class="stat red">3개</div><div style="font-size:.7rem;color:var(--red);margin-top:3px">ch1, ch5, ch9</div></div>
+        <div class="icard"><div class="icard-t">값의 범위</div><div style="font-size:.72rem;color:var(--muted);line-height:1.7">일반 채널: <span style="color:var(--accent)">0.3 ~ 1.8</span><br>아웃라이어: <span style="color:var(--red)">7.0 ~ 13.0</span></div></div>
+        <div class="hbox"><strong>문제:</strong> 아웃라이어 채널이 같은 quantization group에 섞이면 그룹의 범위(scale)가 커져 양자화 오차가 급증합니다.</div>
+      </div>
+    </div>`;
+  } else if(cur===2){
+    v.innerHTML=`<div class="side">
+      <div>
+        ${matHTML(K,OC,false,'K ∈ ℝ^{8×12}')}
+        ${barHTML(SUM,'channel_sum[j] = Σᵢ K[i,j]',OC)}
+      </div>
+      <div class="ipanel">
+        <div class="icard"><div class="icard-t">계산 방법</div><div class="formula">channel_sum[j]<br>= Σᵢ K[i, j]<br><br>= 열 j의 모든 행 합산</div></div>
+        <div class="icard"><div class="icard-t">핵심 아이디어</div><div style="font-size:.72rem;color:var(--muted);line-height:1.7">아웃라이어는 <span style="color:var(--red)">모든 토큰에서 지속적으로 큰 값</span>을 가집니다. 합산 시 자연히 큰 합계 → 아웃라이어 식별 가능</div></div>
+        <div class="icard"><div class="icard-t">채널별 합계</div>${SUM.map((v,i)=>`<div style="display:flex;justify-content:space-between;font-size:.68rem;padding:1px 0;${OC.includes(i)?'color:var(--red);font-weight:700':'color:var(--muted)'}"><span>ch${i}</span><span>${v}</span></div>`).join('')}</div>
+      </div>
+    </div>`;
+  } else if(cur===3){
+    const sortedS=P.map(i=>SUM[i]);
+    const hlLast=Array.from({length:OC.length},(_,i)=>C-OC.length+i);
+    v.innerHTML=`<div class="side">
+      <div>
+        ${barHTML(SUM,'정렬 전 channel_sum',OC)}
+        <div style="margin:8px 0 4px 35px;font-size:.7rem;color:var(--muted)">↓ argsort(channel_sum) — 오름차순 인덱스</div>
+        <div class="mat-title" style="margin-top:4px">P_l = 재배열 인덱스 (총 ${C}개)</div>
+        <div class="p-row">${P.map((idx,pos)=>{const isO=OC.includes(idx);return`<div class="p-item${isO?' oc':''}"><span class="p-pos">pos${pos}</span><span class="p-ch" style="color:${isO?'var(--red)':'var(--accent)'}">${idx}</span><span class="p-sum">${SUM[idx].toFixed(0)}</span></div>`}).join('')}</div>
+        ${barHTML(sortedS,'정렬 후 channel_sum (P_l 순서)',hlLast)}
+      </div>
+      <div class="ipanel">
+        <div class="icard"><div class="icard-t">argsort 란?</div><div style="font-size:.72rem;color:var(--muted);line-height:1.7">실제 배열을 정렬하지 않고, <span style="color:var(--accent)">정렬했을 때의 인덱스</span>만 반환<div class="formula" style="margin-top:6px">sum=[3,65,2,58,1]<br>P  =[4, 2,0, 3,1]</div></div></div>
+        <div class="icard"><div class="icard-t">결과</div><div style="font-size:.72rem;color:var(--muted);line-height:1.7">작은 채널 → 앞<br>아웃라이어 → 뒤<br><br>→ 연속 채널의 <span style="color:var(--green)">크기가 비슷</span><br>→ 그룹 내 범위 ↓</div></div>
+        <div class="icard"><div class="icard-t">추론 시 비용</div><div class="stat green" style="font-size:1rem">O(hd)</div><div style="font-size:.7rem;color:var(--muted);margin-top:3px">인덱스 조회만 필요<br>calibration 시 한 번만 계산</div></div>
+      </div>
+    </div>`;
+  } else if(cur===4){
+    v.innerHTML=`
+      <div class="cmp">
+        <div>
+          <div class="cmp-title" style="color:var(--red)">Before (원본 K)</div>
+          ${matHTML(K,OC,false,'')}
+        </div>
+        <div>
+          <div class="cmp-title" style="color:var(--green)">After (K_reordered)</div>
+          ${matHTML(KR,newOC,false,'')}
+        </div>
+      </div>
+      <div class="hbox" style="margin-top:14px">
+        <strong>핵심:</strong> 아웃라이어 채널(빨간 테두리)이 오른쪽 끝으로 이동했습니다. 비슷한 크기의 채널들이 연속되어 quantization group 내 범위가 좁아집니다.<br><br>
+        <strong>추론 시 적용:</strong> <code style="font-size:.75rem;background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px">K_reordered = K[:, P_l]</code> → 단순 인덱스 선택, O(hd)
+      </div>`;
+  } else {
+    v.innerHTML=`
+      <div class="cmp">
+        <div>
+          <div class="cmp-title" style="color:var(--red)">Before 양자화 그룹</div>
+          ${matHTML(K,OC,true,'')}
+          <div class="rng-chart">
+            <div style="font-size:.68rem;font-weight:700;color:var(--muted);margin-bottom:6px">그룹별 범위 (max − min)</div>
+            ${rngB.map((r,g)=>`<div class="rng-row"><div class="rng-lbl" style="color:${GC[g]}">Group ${g+1}</div><div class="rng-bg"><div class="rng-fill" style="width:${r.range/mx*100}%;background:${GC[g]}"></div></div><div class="rng-val">${r.range}</div></div>`).join('')}
+          </div>
+        </div>
+        <div>
+          <div class="cmp-title" style="color:var(--green)">After 양자화 그룹</div>
+          ${matHTML(KR,newOC,true,'')}
+          <div class="rng-chart">
+            <div style="font-size:.68rem;font-weight:700;color:var(--muted);margin-bottom:6px">그룹별 범위 (max − min)</div>
+            ${rngA.map((r,g)=>`<div class="rng-row"><div class="rng-lbl" style="color:${GC[g]}">Group ${g+1}</div><div class="rng-bg"><div class="rng-fill" style="width:${r.range/mx*100}%;background:${GC[g]}"></div></div><div class="rng-val">${r.range}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div class="icard"><div class="icard-t">범위 합 (Before)</div><div class="stat red">${totB}</div></div>
+        <div class="icard"><div class="icard-t">범위 합 (After)</div><div class="stat green">${totA}</div></div>
+        <div class="icard"><div class="icard-t">범위 감소율</div><div class="stat green">−${redPct}%</div><div style="font-size:.68rem;color:var(--muted);margin-top:2px">양자화 오차 ↓</div></div>
+      </div>`;
+  }
+}
+
+function go(n){
+  if(n<0||n>=STEPS.length)return;
+  cur=n;
+  document.getElementById('stepBar').innerHTML=STEPS.map((s,i)=>`<div class="pill${i===cur?' active':''}" onclick="go(${i})">${s.label}: ${s.title}</div>`).join('');
+  document.getElementById('prevBtn').disabled=cur===0;
+  document.getElementById('nextBtn').disabled=cur===STEPS.length-1;
+  document.getElementById('nextBtn').textContent=cur===STEPS.length-1?'완료 ✓':'다음 →';
+  document.getElementById('sdesc').textContent=DESCS[cur];
+  renderStep();
+}
+
+go(0);
+</script>
+
+</body></html>

@@ -1,0 +1,334 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="UTF-8">
+<title>Hadamard Transform</title>
+<style>
+:root{--bg:#0a0e1a;--card:#131929;--border:#1e2a40;--text:#e2e8f0;--muted:#64748b;--accent:#818cf8;--green:#34d399;--amber:#fbbf24;--red:#f87171;--blue:#60a5fa;}
+@media(prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f1f5f9;--card:#fff;--border:#e2e8f0;--text:#0f172a;--muted:#64748b;}}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;padding:16px 20px;}
+h1{font-size:1.2rem;font-weight:700;margin-bottom:3px;}
+.sub{color:var(--muted);font-size:0.8rem;margin-bottom:12px;}
+.main{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px;}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.panel h3{font-size:0.83rem;font-weight:600;align-self:flex-start;color:var(--muted);}
+.step-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 15px;margin-bottom:11px;}
+.step-row{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.step-num{font-size:0.73rem;color:var(--muted);}
+.badge{font-size:0.73rem;padding:2px 9px;border-radius:12px;font-weight:600;}
+.badge.build{background:rgba(129,140,248,.15);color:var(--accent);}
+.badge.apply{background:rgba(251,191,36,.15);color:var(--amber);}
+.badge.done{background:rgba(52,211,153,.2);color:var(--green);}
+.step-desc{font-size:0.88rem;font-weight:500;}
+.dots{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border);cursor:pointer;transition:background .15s;}
+.dot.active{background:var(--accent);}
+.dot.done{background:var(--green);}
+.ctrls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.btn{background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 13px;font-size:0.82rem;cursor:pointer;}
+.btn:hover{border-color:var(--accent);color:var(--accent);}
+.btn.play{background:var(--accent);color:#fff;border-color:var(--accent);}
+.info-row{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap;}
+.info-chip{font-size:0.75rem;padding:3px 10px;border-radius:8px;background:rgba(255,255,255,.05);border:1px solid var(--border);}
+@media(max-width:560px){.main{grid-template-columns:1fr;}}
+</style>
+
+<h1>하다마르 변환 (Walsh-Hadamard Transform) 시각화</h1>
+<p class="sub">재귀적 행렬 구성 → 버터플라이 연산으로 O(n log n) 벡터 변환</p>
+
+<div class="main">
+  <div class="panel">
+    <h3>행렬 구성 — H₁ → H₂ → H₄ → H₈</h3>
+    <canvas id="matC" width="296" height="296"></canvas>
+  </div>
+  <div class="panel">
+    <h3>버터플라이 연산 — 벡터 변환</h3>
+    <canvas id="bfC" width="296" height="296"></canvas>
+  </div>
+</div>
+
+<div class="step-box">
+  <div class="step-row">
+    <span class="step-num" id="sNum">1 / ?</span>
+    <span class="badge build" id="sBadge">행렬 구성</span>
+  </div>
+  <div class="step-desc" id="sDesc">...</div>
+  <div class="info-row" id="infoRow"></div>
+  <div class="dots" id="dots"></div>
+</div>
+
+<div class="ctrls">
+  <button class="btn" onclick="goPrev()">← 이전</button>
+  <button class="btn play" id="playBtn" onclick="togglePlay()">▶ 재생</button>
+  <button class="btn" onclick="goNext()">다음 →</button>
+  <button class="btn" onclick="init()" style="margin-left:4px;">🎲 새 벡터</button>
+  <label style="font-size:0.8rem;color:var(--muted);margin-left:6px;">속도
+    <input type="range" id="spd" min="400" max="2000" value="1000" step="200" style="width:70px;accent-color:var(--accent)">
+  </label>
+</div>
+
+<script>
+const N = 8; // fixed for butterfly beauty
+
+// --- Hadamard matrix ---
+function buildH(n){
+  let H=[[1]],sz=1;
+  while(sz<n){
+    const H2=[];
+    for(let r=0;r<sz;r++) H2.push([...H[r],...H[r]]);
+    for(let r=0;r<sz;r++) H2.push([...H[r],...H[r].map(x=>-x)]);
+    H=H2;sz*=2;
+  }
+  const sc=1/Math.sqrt(n);
+  return H.map(r=>r.map(x=>x*sc));
+}
+const HMAT=buildH(N);
+
+// Butterfly stage s pairs
+function bfPairs(n,s){
+  const step=1<<s, block=1<<(s+1), pairs=[];
+  for(let g=0;g<n;g+=block) for(let i=0;i<step;i++) pairs.push([g+i,g+i+step]);
+  return pairs;
+}
+
+// Apply butterfly stage s to vector
+function applyBF(x,s){
+  const y=[...x], step=1<<s, block=1<<(s+1), sq2=Math.sqrt(2);
+  for(let g=0;g<x.length;g+=block){
+    for(let i=0;i<step;i++){
+      const a=x[g+i],b=x[g+i+step];
+      y[g+i]=(a+b)/sq2; y[g+i+step]=(a-b)/sq2;
+    }
+  }
+  return y;
+}
+
+// --- Color utilities ---
+function valCol(v,maxRef){
+  const t=Math.min(1,Math.abs(v)/maxRef);
+  if(t<0.33){const p=t/0.33;return `rgb(${Math.round(10+p*60)},${Math.round(14+p*10)},${Math.round(100+p*100)})`;}
+  if(t<0.66){const p=(t-0.33)/0.33;return `rgb(${Math.round(70+p*160)},${Math.round(24+p*20)},${Math.round(200-p*120)})`;}
+  const p=(t-0.66)/0.34;return `rgb(${Math.round(230+p*25)},${Math.round(44+p*170)},${Math.round(80-p*70)})`;
+}
+
+function barCol(v){
+  return v>=0?'rgba(96,165,250,0.85)':'rgba(248,113,113,0.85)';
+}
+
+// --- Draw matrix with block highlight ---
+function drawMat(blockSize, activeCols){
+  const cv=document.getElementById('matC'), ctx=cv.getContext('2d');
+  const W=cv.width, cell=W/N;
+  ctx.clearRect(0,0,W,W);
+
+  for(let r=0;r<N;r++){
+    for(let c=0;c<N;c++){
+      const v=HMAT[r][c];
+      const inBlock = (r<blockSize && c<blockSize);
+      let alpha = blockSize>=N ? 1 : (inBlock ? 1 : 0.18);
+      // For block structure steps, distinguish sub-blocks
+      const topLeft = r<blockSize/2 && c<blockSize/2;
+      const topRight = r<blockSize/2 && c>=blockSize/2 && c<blockSize;
+      const botLeft  = r>=blockSize/2 && r<blockSize && c<blockSize/2;
+      const botRight = r>=blockSize/2 && r<blockSize && c>=blockSize/2 && c<blockSize;
+
+      let baseColor;
+      if(!inBlock || blockSize<=1){
+        baseColor=valCol(v,1/Math.sqrt(N));
+      } else {
+        // Color sub-blocks
+        if(topLeft||botLeft) baseColor=valCol(v,1/Math.sqrt(blockSize));
+        else baseColor=valCol(-v,1/Math.sqrt(blockSize)); // right half mirrored for visual
+        if(botRight) baseColor=valCol(-v,1/Math.sqrt(blockSize));
+      }
+
+      ctx.globalAlpha=alpha;
+      ctx.fillStyle=baseColor;
+      ctx.fillRect(c*cell+1,r*cell+1,cell-2,cell-2);
+      ctx.globalAlpha=1;
+
+      // Value text (only for small visible blocks)
+      if(inBlock && blockSize<=8){
+        ctx.fillStyle=alpha>0.5?'rgba(255,255,255,0.9)':'rgba(255,255,255,0.3)';
+        const fs=Math.max(8,Math.min(13,Math.round(cell*0.4)));
+        ctx.font=`bold ${fs}px sans-serif`;
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        const sign=v>0?'+':'−';
+        ctx.fillText(sign,c*cell+cell/2,r*cell+cell/2);
+      }
+    }
+  }
+
+  // Draw block border
+  if(blockSize<N){
+    ctx.strokeStyle='#818cf8';ctx.lineWidth=2.5;ctx.setLineDash([]);
+    ctx.strokeRect(0.5,0.5,blockSize*cell-0.5,blockSize*cell-0.5);
+    // half-block dashed dividers
+    if(blockSize>1){
+      const half=blockSize/2;
+      ctx.strokeStyle='rgba(129,140,248,0.5)';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+      ctx.beginPath();
+      ctx.moveTo(half*cell,0);ctx.lineTo(half*cell,blockSize*cell);
+      ctx.moveTo(0,half*cell);ctx.lineTo(blockSize*cell,half*cell);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // μ label
+  ctx.fillStyle='#34d399';ctx.font='11px sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText(`μ = 1.000  모든 |Hᵢⱼ| = 1/√${N} = ${(1/Math.sqrt(N)).toFixed(3)}`,2,W-3);
+}
+
+// --- Draw butterfly ---
+function drawBF(vecStates, stageIdx, pairs, showPairs){
+  const cv=document.getElementById('bfC'), ctx=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  ctx.clearRect(0,0,W,H);
+
+  const x=vecStates[stageIdx];
+  if(!x){
+    // Show placeholder
+    ctx.fillStyle='var(--muted)';ctx.font='13px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('← 행렬 구성 단계',W/2,H/2);
+    return;
+  }
+
+  const n=x.length;
+  const BW=20, gap=(W-n*BW)/(n+1);
+  const bary=H*0.72; // bar bottom y
+  const maxH=H*0.52;
+  const maxAbs=Math.max(...x.map(Math.abs),0.01);
+
+  // Draw stage labels at top
+  const logN=Math.log2(n);
+  ctx.font='10px sans-serif';ctx.textAlign='center';ctx.fillStyle='#64748b';
+  for(let s=0;s<logN;s++){
+    const ys=20+(s*(H*0.18));
+    ctx.fillText(`단계 ${s+1}`,W-28,ys);
+  }
+
+  // Draw butterfly arcs for active stage
+  if(showPairs && pairs){
+    const arcY=bary-maxH-10;
+    for(const [i,j] of pairs){
+      const xi=(i+1)*(gap)+i*BW+BW/2;
+      const xj=(j+1)*(gap)+j*BW+BW/2;
+      const arcH=Math.abs(xj-xi)*0.42;
+      ctx.strokeStyle='rgba(251,191,36,0.6)';ctx.lineWidth=1.8;ctx.setLineDash([]);
+      // Top arc
+      ctx.beginPath();
+      ctx.moveTo(xi,bary-Math.abs(x[i])/maxAbs*maxH*Math.sign(x[i]>0?1:-1)*0+bary-5);
+      const mx=(xi+xj)/2;
+      ctx.quadraticCurveTo(mx, arcY-arcH, xj, bary-5);
+      ctx.stroke();
+      // Small circles at endpoints
+      ctx.fillStyle='rgba(251,191,36,0.9)';
+      ctx.beginPath();ctx.arc(xi,bary-5,3,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(xj,bary-5,3,0,Math.PI*2);ctx.fill();
+    }
+  }
+
+  // Draw bars
+  for(let i=0;i<n;i++){
+    const bx=(i+1)*gap+i*BW;
+    const v=x[i];
+    const bh=Math.abs(v)/maxAbs*maxH;
+    const by=v>=0 ? bary-bh : bary;
+    ctx.fillStyle=barCol(v);
+    ctx.fillRect(bx, by, BW, bh);
+    // Index label
+    ctx.fillStyle='#64748b';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillText(`x${i}`,bx+BW/2,bary+5);
+    // Value
+    ctx.fillStyle='#94a3b8';ctx.font='9px sans-serif';ctx.textBaseline='alphabetic';
+    ctx.fillText(v.toFixed(2),bx+BW/2, v>=0?by-2:bary-bh-2);
+  }
+
+  // Center line
+  ctx.strokeStyle='#334155';ctx.lineWidth=1;ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(0,bary);ctx.lineTo(W,bary);ctx.stroke();
+
+  // Energy label
+  const energy=x.reduce((s,v)=>s+v*v,0);
+  ctx.fillStyle='#64748b';ctx.font='10px sans-serif';ctx.textAlign='left';ctx.textBaseline='alphabetic';
+  ctx.fillText(`‖x‖² = ${energy.toFixed(3)}  (보존됨)`,4,H-4);
+}
+
+// --- Steps ---
+let steps=[], curStep=0, playing=false, timer=null;
+let vecStates=[];
+
+function init(){
+  clearTimeout(timer);playing=false;
+  document.getElementById('playBtn').textContent='▶ 재생';
+
+  // Random input vector (normalized)
+  let x0=[];
+  for(let i=0;i<N;i++) x0.push((Math.random()-0.5)*2);
+  const nrm=Math.sqrt(x0.reduce((s,v)=>s+v*v,0));
+  x0=x0.map(v=>v/nrm);
+
+  // Precompute vector at each butterfly stage
+  vecStates=[null,null,null,null,x0]; // first 4 steps are construction
+  let vc=x0;
+  for(let s=0;s<Math.log2(N);s++){
+    vc=applyBF(vc,s);
+    vecStates.push(vc);
+  }
+  vecStates.push(vc); // final
+
+  const logN=Math.log2(N);
+  steps=[
+    {mat:1,   vec:null, pairs:null, showPairs:false, phase:'build', desc:`H₁ = [1] — 1×1 단위행렬에서 시작`, info:[`블록 크기: 1×1`]},
+    {mat:2,   vec:null, pairs:null, showPairs:false, phase:'build', desc:`H₂ = (1/√2) [[H₁, H₁],[H₁, −H₁]] — 2×2 블록 구성`, info:['모든 항목 = ±1/√2 ≈ 0.707']},
+    {mat:4,   vec:null, pairs:null, showPairs:false, phase:'build', desc:`H₄ = (1/√2) [[H₂, H₂],[H₂, −H₂]] — 4×4 블록 구성`, info:['모든 항목 = ±1/√4 = 0.500']},
+    {mat:8,   vec:null, pairs:null, showPairs:false, phase:'build', desc:`H₈ 완성! 모든 항목 = ±1/√8 ≈ 0.354 → μ = 1 (이론적 최솟값 ✓)`, info:['μ = 1','항목 수: 64개','양수/음수 각 32개']},
+    {mat:8,   vec:0,    pairs:null, showPairs:false, phase:'apply', desc:`무작위 입력 벡터 x (에너지 ‖x‖² = 1) — Hx 계산 시작`, info:['파란 막대: 양수','빨간 막대: 음수']},
+    {mat:8,   vec:1,    pairs:bfPairs(N,0), showPairs:true,  phase:'apply', desc:`버터플라이 1단계: 인접 쌍 (x₀,x₁),(x₂,x₃),(x₄,x₅),(x₆,x₇) → (a+b, a-b)/√2`, info:[`${N/2}개 버터플라이 연산`]},
+    {mat:8,   vec:2,    pairs:bfPairs(N,1), showPairs:true,  phase:'apply', desc:`버터플라이 2단계: 거리 2 쌍 (x₀,x₂),(x₁,x₃),(x₄,x₆),(x₅,x₇)`, info:[`${N/2}개 버터플라이 연산`]},
+    {mat:8,   vec:3,    pairs:bfPairs(N,2), showPairs:true,  phase:'apply', desc:`버터플라이 3단계: 거리 4 쌍 (x₀,x₄),(x₁,x₅),(x₂,x₆),(x₃,x₇)`, info:[`${N/2}개 버터플라이 연산`]},
+    {mat:8,   vec:4,    pairs:null, showPairs:false, phase:'done', desc:`Hx 완성! 에너지 ‖x‖² 보존 — 총 연산: ${N*logN/2}회 (O(n log n) = ${N}×${logN}÷2)`, info:['에너지 균등 분산','Gram-Schmidt 대비 O(n²)→O(n log n)','결정론적 (무작위성 없음)']},
+  ];
+  curStep=0;
+  render();
+}
+
+function render(){
+  const s=steps[curStep];
+  drawMat(s.mat,[]);
+  drawBF(vecStates, s.vec, s.pairs, s.showPairs);
+  document.getElementById('sDesc').textContent=s.desc;
+  document.getElementById('sNum').textContent=`${curStep+1} / ${steps.length}`;
+  const sb=document.getElementById('sBadge');
+  sb.textContent={build:'행렬 구성',apply:'버터플라이 적용',done:'완성 ✓'}[s.phase]||s.phase;
+  sb.className='badge '+(s.phase==='done'?'done':s.phase==='build'?'build':'apply');
+  document.getElementById('infoRow').innerHTML=s.info.map(t=>`<span class="info-chip">${t}</span>`).join('');
+  const dc=document.getElementById('dots');
+  dc.innerHTML='';
+  steps.forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='dot'+(i<curStep?' done':i===curStep?' active':'');
+    d.onclick=()=>{curStep=i;render();};
+    dc.appendChild(d);
+  });
+}
+
+function goNext(){if(curStep<steps.length-1){curStep++;render();}}
+function goPrev(){if(curStep>0){curStep--;render();}}
+function togglePlay(){
+  playing=!playing;
+  document.getElementById('playBtn').textContent=playing?'⏸ 정지':'▶ 재생';
+  if(playing) tick(); else clearTimeout(timer);
+}
+function tick(){
+  if(!playing)return;
+  if(curStep>=steps.length-1){playing=false;document.getElementById('playBtn').textContent='▶ 재생';return;}
+  goNext();
+  const delay=2200-parseInt(document.getElementById('spd').value);
+  timer=setTimeout(tick,Math.max(400,delay));
+}
+
+init();
+</script>
+
+</body></html>
